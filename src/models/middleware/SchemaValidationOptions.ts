@@ -1,6 +1,6 @@
 import { ObjectSchema } from '@hapi/joi';
 
-export interface HandlerOptions {
+export interface SchemaValidationOptions {
     validation?: {
         body?: ObjectSchema
     }

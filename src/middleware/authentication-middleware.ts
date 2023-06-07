@@ -1,36 +1,23 @@
 import {
   RequestHandler, Request, Response, NextFunction
 } from 'express';
-import { ValidationError } from '@hapi/joi';
 import { JwtPayload, decode } from 'jsonwebtoken';
-import BadRequestError from '../errors/BadRequestError';
-import UnauthorizedError from '../errors/UnauthorizedError';
+import UnauthenticatedError from '../errors/UnauthenticatedError';
 import logger from '../logger';
-import { HandlerOptions } from '../models/middleware/HandlerOptions';
-
-const getMessageFromJoiError = (error: ValidationError): string | undefined => {
-  if (!error.details && error.message) {
-      return error.message;
-  }
-  return error.details && error.details.length > 0 && error.details[0].message
-    ? `PATH: [${error.details[0].path}] ;; MESSAGE: ${error.details[0].message}` : undefined;
-};
 
 const verifyAuthHeader = async (header: string) => {
     if (header) {
         const authHeaderItems: Array<string> = header.split(/[ ]+/);
 
         if (authHeaderItems.length > 1) {
-            const authHeaderPrefix: string = authHeaderItems[0].trim().toLowerCase();
+            const [authType, authValue] = authHeaderItems;
 
             const { GOOGLE_OAUTH_AUDIENCE, GOOGLE_OAUTH_ISSUER, SAINT_PORTAL_API_KEY } = process.env;
 
-            switch(authHeaderPrefix) {
+            switch(authType.trim().toLowerCase()) {
                 case 'bearer':
-                    const [_, encodedToken] = authHeaderItems;
-
                     try {
-                        const { aud, exp, iss, scp } = decode(encodedToken) as JwtPayload
+                        const { aud, exp, iss, scp } = decode(authValue) as JwtPayload
 
                         return Boolean(
                             aud === GOOGLE_OAUTH_AUDIENCE && 
@@ -48,9 +35,7 @@ const verifyAuthHeader = async (header: string) => {
                     }
 
                 case 'apikey':
-                    const apikey: string = authHeaderItems[1];
-
-                    return [SAINT_PORTAL_API_KEY].includes(apikey);
+                    return [SAINT_PORTAL_API_KEY].includes(authValue);
             }
         } else {
             return false;
@@ -66,26 +51,15 @@ const verifyAuthHeader = async (header: string) => {
  * instead of crashing the app
  * @param handler Request handler to check for error
  */
-export const requestMiddleware = (
+export const authenticationMiddleware = (
     handler: RequestHandler,
-    options?: HandlerOptions
 ): RequestHandler => async (req: Request, res: Response, next: NextFunction) => {
-    const authHeader: string = (req.headers["Authorization"] ?? req.headers["authorization"] )as string;
+    const authHeader: string = (req.headers["Authorization"] ?? req.headers["authorization"]) as string;
 
     const authHeaderValid: boolean = await verifyAuthHeader(authHeader);
 
     if (!authHeaderValid) {
-        next(new UnauthorizedError('Unable to authenticate request'));
-    }
-
-    if (options?.validation?.body) {
-        const { error } = options?.validation?.body.validate(req.body);
-
-        if (error) {
-            next(new BadRequestError(getMessageFromJoiError(error)));
-
-            return;
-        }
+        next(new UnauthenticatedError('Unable to auth request'));
     }
 
     try {
@@ -105,4 +79,4 @@ export const requestMiddleware = (
     };
 };
 
-export default requestMiddleware;
+export default authenticationMiddleware;
