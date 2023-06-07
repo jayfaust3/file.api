@@ -2,7 +2,7 @@ import {
   RequestHandler, Request, Response, NextFunction
 } from 'express';
 import { ValidationError } from '@hapi/joi';
-import { LoginTicket, OAuth2Client, TokenPayload } from 'google-auth-library';
+import { JwtPayload, decode } from 'jsonwebtoken';
 import BadRequestError from '../errors/BadRequestError';
 import UnauthorizedError from '../errors/UnauthorizedError';
 import logger from '../logger';
@@ -23,27 +23,20 @@ const verifyAuthHeader = async (header: string) => {
         if (authHeaderItems.length > 1) {
             const authHeaderPrefix: string = authHeaderItems[0].trim().toLowerCase();
 
-            const { GOOGLE_OAUTH_AUDIENCE, GOOGLE_OAUTH_ISSUER, GOOGLE_OAUTH_CLIENT_SECRET, SAINT_PORTAL_API_KEY } = process.env;
+            const { GOOGLE_OAUTH_AUDIENCE, GOOGLE_OAUTH_ISSUER, SAINT_PORTAL_API_KEY } = process.env;
 
             switch(authHeaderPrefix) {
                 case 'bearer':
-                    const token: string = authHeaderItems[1];
-
-                    const client = new OAuth2Client(
-                        GOOGLE_OAUTH_AUDIENCE,
-                        GOOGLE_OAUTH_CLIENT_SECRET
-                    );
+                    const [_, encodedToken] = authHeaderItems;
 
                     try {
-                        const verificatioData: LoginTicket = await client.verifyIdToken({
-                            idToken: token,
-                            audience: GOOGLE_OAUTH_AUDIENCE
-                        });
+                        const { aud, exp, iss, scp } = decode(encodedToken) as JwtPayload
 
-                        const tokenPayload: TokenPayload = verificatioData.getPayload();
-
-                        return [GOOGLE_OAUTH_ISSUER].includes(tokenPayload.iss) && 
-                            tokenPayload.exp > Date.now() / 1000;
+                        return Boolean(
+                            aud === GOOGLE_OAUTH_AUDIENCE && 
+                            [GOOGLE_OAUTH_ISSUER].includes(iss) && 
+                            exp > Date.now() / 1000
+                        );
                     } catch (err) {
                         logger.log({
                             level: 'error',
