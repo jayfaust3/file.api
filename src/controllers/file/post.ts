@@ -1,6 +1,6 @@
 import { Request, RequestHandler } from 'express';
 import Joi from '@hapi/joi';
-import { authenticationMiddleware, authorizationMiddleware, schemaValidationMiddleware } from '../../middleware';
+import { requestMiddleware } from '../../middleware';
 import { S3Service } from '../../services/aws/S3Service';
 import { APIResponse } from '../../models/api/APIResponse';
 import { File } from '../../models/dto/File';
@@ -25,19 +25,17 @@ const post: RequestHandler = async (req: Request<{}, APIResponse<File>, File>, r
   });
 };
 
-export default authenticationMiddleware(
-  authorizationMiddleware(
-    schemaValidationMiddleware(
-      post,
-      {
-        validation: { 
-          body: fileSchema
-        }
-      }
-    ),
+export default requestMiddleware(
+    post,
     {
-      authorizedScopes: ['file:write'],
-      allowApiKeyAccess: false
+        auth: {
+            authorizedScopes: ['file:write'],
+            allowApiKeyAccess: false
+        },
+        schema: {
+            validation: { 
+                body: fileSchema
+            }
+        }
     }
-  )
 );

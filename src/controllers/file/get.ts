@@ -1,5 +1,5 @@
 import { Request, RequestHandler } from 'express';
-import { authenticationMiddleware, authorizationMiddleware } from '../../middleware';
+import { requestMiddleware } from '../../middleware';
 import { S3Service } from '../../services/aws/S3Service';
 import { APIResponse } from '../../models/api/APIResponse';
 import { File } from '../../models/dto/File';
@@ -19,12 +19,12 @@ const get: RequestHandler = async (req: Request<{}, APIResponse<File>, {}>, res)
     });
 };
 
-export default authenticationMiddleware(
-    authorizationMiddleware(
-      get,
-      {
-        authorizedScopes: ['file:read'],
-        allowApiKeyAccess: false
-      }
-    )
-  );
+export default requestMiddleware(
+    get,
+    {
+        auth: {
+          authorizedScopes: ['file:read'],
+          allowApiKeyAccess: false
+        }
+    }
+);
