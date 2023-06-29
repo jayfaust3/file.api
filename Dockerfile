@@ -1,4 +1,4 @@
-FROM node:14.17.1 as base
+FROM node:18-alpine as base
 
 # Add package file
 COPY package*.json ./
@@ -15,7 +15,7 @@ COPY openapi.json ./openapi.json
 RUN npm run build
 
 # Start production image build
-FROM gcr.io/distroless/nodejs:14
+FROM gcr.io/distroless/nodejs:18
 
 # Copy node modules and build directory
 COPY --from=base ./node_modules ./node_modules
